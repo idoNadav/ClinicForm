@@ -216,6 +216,7 @@
     width: 100%;
     padding: 6px 10px;
     border: 1.5px solid var(--gray-200);
+    min-height: 34px;
     border-radius: 6px;
     font-size: .9rem;
     font-family: inherit;
@@ -607,6 +608,20 @@
   <details>
     <summary>
       <span class="arrow">&#9660;</span>
+      ימ"ח
+      <span class="counter" id="ymachCounter">0/0</span>
+    </summary>
+    <div class="card-body" id="ymachBody"></div>
+    <div class="card-body" id="ymachKitsArea">
+      <h3 style="margin:12px 0 8px;font-size:1.05rem;color:var(--primary)">ספירת סמים - ערכות</h3>
+      <div id="ymachKitsContainer"></div>
+      <button type="button" id="addYmachKitBtn" style="margin:10px 0;padding:8px 18px;font-size:.95rem;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;width:auto;display:inline-block">+ הוסף ערכה</button>
+    </div>
+  </details>
+
+  <details>
+    <summary>
+      <span class="arrow">&#9660;</span>
       מעקב אחר דוח זימונים
     </summary>
     <div class="card-body">
@@ -727,7 +742,6 @@ const SECTIONS = {
       { title: 'פנס ראש', desc: '' },
       { title: 'קומבט גז', desc: '' },
       { title: 'ערכת וריד פריפרי', desc: '' },
-      { title: 'בדיקות כוננות יומיות ושבועיות', desc: '' },
       { title: 'בלון חמצן (רלוונטי רק לחופ"ל)', desc: 'אם החמצן כולל ווסת - בדיקה הידרוסטטית בתוקף', noteHints: 'תוקף בלון חמצן-\nתוקף וסת-\nלחץ בלון-' },
     ]
   },
@@ -764,8 +778,24 @@ const SECTIONS = {
       { title: 'צריכה בהתאם לזמנך יקר', desc: '' },
       { title: 'הדפסת דוחות תנועות מלאי', desc: '' },
     ]
+  },
+  ymach: {
+    containerId: 'ymachBody',
+    counterId: 'ymachCounter',
+    items: [
+      { title: 'שליטה ובקרה כללית', desc: '' },
+      { title: 'שליטה ובקרה על ערכות פתוחות וסגורות', desc: '' },
+    ]
   }
 }
+
+const YMACH_DRUGS = [
+  { name: 'מורפיום' },
+  { name: 'קטמין 50 מ"ג' },
+  { name: 'קטמין 10 מ"ג' },
+  { name: 'מידזולם' },
+  { name: 'אקטיק' },
+]
 
 const DRUG_INVENTORY = [
   { name: 'קטאמין 50', record: '', actual: '' },
@@ -818,15 +848,11 @@ function createCheckItem (sectionKey, idx, item) {
     contentDiv.appendChild(descDiv)
   }
 
-  var notesInput
+  var notesInput = document.createElement('textarea')
+  notesInput.rows = item.noteHints ? item.noteHints.split('\n').length : 1
   if (item.noteHints) {
-    notesInput = document.createElement('textarea')
-    notesInput.rows = item.noteHints.split('\n').length
     notesInput.value = item.noteHints
     state[id].notes = item.noteHints
-  } else {
-    notesInput = document.createElement('input')
-    notesInput.type = 'text'
   }
   notesInput.className = 'check-notes'
   notesInput.placeholder = 'הערות...'
@@ -969,6 +995,53 @@ function buildDrugInventoryTable () {
   })
 }
 
+var ymachKitCount = 0
+
+function addYmachKit (kitName) {
+  var idx = ymachKitCount++
+  var container = document.getElementById('ymachKitsContainer')
+  var wrapper = document.createElement('div')
+  wrapper.className = 'ymach-kit-block'
+  wrapper.id = 'ymach_kit_' + idx
+  wrapper.style.cssText = 'border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--gray-50)'
+
+  var header = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+  header += '<div style="display:flex;gap:8px;align-items:center;flex:1">'
+  header += '<input type="text" class="ymach-kit-name" id="ymach_kit_name_' + idx + '" placeholder="שם ערכה..." value="' + (kitName || '') + '" style="font-weight:600;font-size:1rem;padding:6px 10px;border:1px solid var(--gray-300);border-radius:6px;flex:1">'
+  header += '<input type="text" class="ymach-kit-framework" id="ymach_kit_framework_' + idx + '" placeholder="מסגרת..." style="padding:6px 10px;border:1px solid var(--gray-300);border-radius:6px;width:140px">'
+  header += '</div>'
+  header += '<button type="button" onclick="removeYmachKit(' + idx + ')" style="background:#dc2626;color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;margin-right:8px">✕</button>'
+  header += '</div>'
+
+  var table = '<table class="inv-table"><thead><tr>'
+  table += '<th>תרופה</th><th>כמות</th>'
+  table += '</tr></thead><tbody>'
+  for (var i = 0; i < YMACH_DRUGS.length; i++) {
+    table += '<tr>'
+    table += '<td class="drug-name">' + YMACH_DRUGS[i].name + '</td>'
+    table += '<td><input type="text" class="ymach-drug-qty" data-kit="' + idx + '" data-drug="' + i + '" placeholder="—"></td>'
+    table += '</tr>'
+  }
+  table += '<tr><td><input type="text" class="ymach-drug-extra-name" data-kit="' + idx + '" placeholder="תרופה נוספת..."></td>'
+  table += '<td><input type="text" class="ymach-drug-extra-qty" data-kit="' + idx + '" placeholder="—"></td></tr>'
+  table += '</tbody></table>'
+
+  wrapper.innerHTML = header + table
+  container.appendChild(wrapper)
+}
+
+function removeYmachKit (idx) {
+  var el = document.getElementById('ymach_kit_' + idx)
+  if (el) el.remove()
+}
+
+function buildYmachDrugTable () {
+  addYmachKit('')
+  document.getElementById('addYmachKitBtn').addEventListener('click', function () {
+    addYmachKit('')
+  })
+}
+
 function init () {
   var keys = Object.keys(SECTIONS)
   for (var k = 0; k < keys.length; k++) {
@@ -1023,6 +1096,7 @@ function init () {
   })
 
   buildDrugInventoryTable()
+  buildYmachDrugTable()
   updateCounters()
 
   try {
@@ -1099,6 +1173,28 @@ function collectData () {
         arr.push({ title: INV_CHECKS[c], status: status, notes: notes })
       }
       return arr
+    })(),
+    ymachKits: (function () {
+      var kits = []
+      var blocks = document.querySelectorAll('.ymach-kit-block')
+      for (var b = 0; b < blocks.length; b++) {
+        var kitId = blocks[b].id.replace('ymach_kit_', '')
+        var kitName = document.getElementById('ymach_kit_name_' + kitId).value || ''
+        var framework = document.getElementById('ymach_kit_framework_' + kitId).value || ''
+        var drugs = []
+        var qtyInputs = blocks[b].querySelectorAll('.ymach-drug-qty')
+        for (var q = 0; q < qtyInputs.length; q++) {
+          var drugIdx = qtyInputs[q].dataset.drug
+          drugs.push({ name: YMACH_DRUGS[drugIdx].name, qty: qtyInputs[q].value })
+        }
+        var extraNameEl = blocks[b].querySelector('.ymach-drug-extra-name')
+        var extraQtyEl = blocks[b].querySelector('.ymach-drug-extra-qty')
+        if (extraNameEl && extraNameEl.value) {
+          drugs.push({ name: extraNameEl.value, qty: extraQtyEl ? extraQtyEl.value : '' })
+        }
+        kits.push({ kitName: kitName, framework: framework, drugs: drugs })
+      }
+      return kits
     })()
   }
 }
@@ -1206,6 +1302,16 @@ function exportToWord () {
     return new Paragraph(config)
   }
 
+  function multiLineParagraphs (text, runOpts, lastSpaceAfter) {
+    var lines = text.split('\n')
+    var result = []
+    for (var ml = 0; ml < lines.length; ml++) {
+      var isLast = ml === lines.length - 1
+      result.push(rtlP(rtlRun(lines[ml], runOpts), isLast ? { spaceAfter: lastSpaceAfter || 240 } : { spaceAfter: 40 }))
+    }
+    return result
+  }
+
   function hdrCell (text) {
     return new TableCell({
       children: [rtlP(rtlRun(text, { bold: true, color: 'FFFFFF', size: 22 }), { alignment: AlignmentType.CENTER })],
@@ -1260,7 +1366,7 @@ function exportToWord () {
 
   children.push(rtlP(rtlRun(''), { spaceAfter: 40 }))
 
-  var labels = { main: '\u05d8\u05d1\u05dc\u05ea \u05d1\u05d9\u05e7\u05d5\u05e8\u05ea \u05e8\u05d0\u05e9\u05d9\u05ea', ambulance: '\u05d0\u05de\u05d1\u05d5\u05dc\u05e0\u05e1 \u05d5\u05db\u05d5\u05e0\u05e0\u05d5\u05ea', treatment: '\u05d7\u05d3\u05e8 \u05d4\u05d8\u05d9\u05e4\u05d5\u05dc\u05d9\u05dd \u05d5\u05e8\u05d5\u05e4\u05d0', medication: '\u05d7\u05d3\u05e8 \u05d4\u05ea\u05e8\u05d5\u05e4\u05d5\u05ea', vest: '\u05d5\u05d5\u05e1\u05d8 \u05d7\u05d5\u05d1\u05e9', training: '\u05db\u05e9\u05d9\u05e8\u05d5\u05d9\u05d5\u05ea \u05d5\u05d0\u05d9\u05de\u05d5\u05e0\u05d9\u05dd', drugs: '\u05e1\u05e4\u05d9\u05e8\u05ea \u05e1\u05de\u05d9\u05dd, \u05e6\u05d9\u05d5\u05d3 \u05db\u05d5\u05e0\u05e0\u05d5\u05ea, \u05d5\u05d5\u05e1\u05d8 \u05de\u05d8"\u05d1 \u05d5\u05ea\u05d9\u05e7 \u05d0\u05e8"\u05df', inv: '\u05e0\u05d9\u05d4\u05d5\u05dc \u05d4\u05de\u05dc\u05d0\u05d9' }
+  var labels = { main: '\u05d8\u05d1\u05dc\u05ea \u05d1\u05d9\u05e7\u05d5\u05e8\u05ea \u05e8\u05d0\u05e9\u05d9\u05ea', ambulance: '\u05d0\u05de\u05d1\u05d5\u05dc\u05e0\u05e1 \u05d5\u05db\u05d5\u05e0\u05e0\u05d5\u05ea', treatment: '\u05d7\u05d3\u05e8 \u05d4\u05d8\u05d9\u05e4\u05d5\u05dc\u05d9\u05dd \u05d5\u05e8\u05d5\u05e4\u05d0', medication: '\u05d7\u05d3\u05e8 \u05d4\u05ea\u05e8\u05d5\u05e4\u05d5\u05ea', vest: '\u05d5\u05d5\u05e1\u05d8 \u05d7\u05d5\u05d1\u05e9', training: '\u05db\u05e9\u05d9\u05e8\u05d5\u05d9\u05d5\u05ea \u05d5\u05d0\u05d9\u05de\u05d5\u05e0\u05d9\u05dd', drugs: '\u05e1\u05e4\u05d9\u05e8\u05ea \u05e1\u05de\u05d9\u05dd, \u05e6\u05d9\u05d5\u05d3 \u05db\u05d5\u05e0\u05e0\u05d5\u05ea, \u05d5\u05d5\u05e1\u05d8 \u05de\u05d8"\u05d1 \u05d5\u05ea\u05d9\u05e7 \u05d0\u05e8"\u05df', inv: '\u05e0\u05d9\u05d4\u05d5\u05dc \u05d4\u05de\u05dc\u05d0\u05d9', ymach: '\u05d9\u05de"\u05d7' }
   var lkeys = Object.keys(labels)
   for (var lk = 0; lk < lkeys.length; lk++) {
     var tbl = buildTable(lkeys[lk])
@@ -1308,17 +1414,43 @@ function exportToWord () {
     }
   }
 
+  if (data.ymachKits && data.ymachKits.length > 0) {
+    for (var ki = 0; ki < data.ymachKits.length; ki++) {
+      var kit = data.ymachKits[ki]
+      var hasKitData = kit.drugs.some(function (d) { return d.qty })
+      if (!hasKitData) continue
+      var kitTitle = '\u05e1\u05e4\u05d9\u05e8\u05ea \u05e1\u05de\u05d9\u05dd - ' + (kit.kitName || '\u05e2\u05e8\u05db\u05d4')
+      if (kit.framework) kitTitle += ' (\u05de\u05e1\u05d2\u05e8\u05ea: ' + kit.framework + ')'
+      children.push(rtlP(rtlRun(kitTitle, { bold: true, underline: true, size: 24 }), { spaceAfter: 60, keepNext: true }))
+      var ymRows = [new TableRow({ children: [hdrCell('\u05ea\u05e8\u05d5\u05e4\u05d4'), hdrCell('\u05db\u05de\u05d5\u05ea')], tableHeader: true, cantSplit: true })]
+      for (var yi = 0; yi < kit.drugs.length; yi++) {
+        if (!kit.drugs[yi].qty) continue
+        var ymSh = yi % 2 === 1 ? { type: ShadingType.SOLID, color: LIGHT_GRAY } : undefined
+        ymRows.push(new TableRow({ cantSplit: true, children: [
+          new TableCell({ children: [rtlP(rtlRun(kit.drugs[yi].name, { bold: true, size: 20 }), { keepNext: true })], shading: ymSh }),
+          new TableCell({ children: [rtlP(rtlRun(kit.drugs[yi].qty, { size: 20 }), { alignment: AlignmentType.CENTER })], shading: ymSh }),
+        ]}))
+      }
+      children.push(new Table({ rows: ymRows, width: { size: 100, type: WidthType.PERCENTAGE }, visuallyRightToLeft: true }))
+      children.push(rtlP(rtlRun(''), { spaceAfter: 160 }))
+    }
+  }
+
   if (data.appointmentNotes) {
     children.push(rtlP(rtlRun('\u05de\u05e2\u05e7\u05d1 \u05d0\u05d7\u05e8 \u05d3\u05d5\u05d7 \u05d6\u05d9\u05de\u05d5\u05e0\u05d9\u05dd', { bold: true, underline: true, size: 28 }), { spaceAfter: 60 }))
-    children.push(rtlP(rtlRun(data.appointmentNotes, { size: 22 }), { spaceAfter: 240 }))
+    multiLineParagraphs(data.appointmentNotes, { size: 22 }, 240).forEach(function (p) { children.push(p) })
   }
   if (data.referralNotes) {
     children.push(rtlP(rtlRun('\u05de\u05e2\u05e7\u05d1 \u05d0\u05d7\u05e8 \u05d1\u05d9\u05e6\u05d5\u05e2 \u05d4\u05e4\u05e0\u05d9\u05d5\u05ea', { bold: true, underline: true, size: 28 }), { spaceAfter: 60 }))
-    children.push(rtlP(rtlRun(data.referralNotes, { size: 22 }), { spaceAfter: 240 }))
+    multiLineParagraphs(data.referralNotes, { size: 22 }, 240).forEach(function (p) { children.push(p) })
   }
   if (data.summary) {
     children.push(rtlP(rtlRun('\u05e1\u05d9\u05db\u05d5\u05dd \u05d5\u05d4\u05de\u05dc\u05e6\u05d5\u05ea', { bold: true, underline: true, size: 28 }), { spaceAfter: 60 }))
-    children.push(rtlP(rtlRun(data.summary, { size: 22 }), { spaceAfter: 240 }))
+    var sumLines = data.summary.split('\n').filter(function (l) { return l.trim() })
+    for (var si = 0; si < sumLines.length; si++) {
+      var isLastSum = si === sumLines.length - 1
+      children.push(rtlP(rtlRun('\u2022 ' + sumLines[si].trim(), { size: 22 }), isLastSum ? { spaceAfter: 240 } : { spaceAfter: 40 }))
+    }
   }
 
   children.push(rtlP(rtlRun(''), { spaceAfter: 200 }))
