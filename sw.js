@@ -1,4 +1,4 @@
-var CACHE_NAME = 'bikoret-v1'
+var CACHE_NAME = 'bikoret-v2'
 var ASSETS = [
   './',
   './ביקורת-מרפאה.html',

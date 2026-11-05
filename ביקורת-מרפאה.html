@@ -424,6 +424,46 @@
     border-color: #dc2626;
   }
 
+  .ymach-subhead {
+    margin: 4px 0 10px;
+    font-size: 1.05rem;
+    color: var(--primary);
+  }
+
+  .ymach-sample-block {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: white;
+  }
+
+  .ymach-sample-top {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 4px;
+  }
+
+  .ymach-sample-remove {
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+
+  .sample-add-btn {
+    margin: 4px 0 8px;
+    padding: 8px 18px;
+    font-size: .95rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
   .export-bar {
     position: fixed;
     bottom: 0;
@@ -611,6 +651,11 @@
       ימ"ח
       <span class="counter" id="ymachCounter">0/0</span>
     </summary>
+    <div class="card-body" id="ymachSampleArea">
+      <h3 class="ymach-subhead">בדיקה מדגמית</h3>
+      <div id="ymachSamplesContainer"></div>
+      <button type="button" id="addYmachSampleBtn" class="sample-add-btn">+ הוסף בדיקה מדגמית</button>
+    </div>
     <div class="card-body" id="ymachBody"></div>
     <div class="card-body" id="ymachKitsArea">
       <h3 style="margin:12px 0 8px;font-size:1.05rem;color:var(--primary)">ספירת סמים - ערכות</h3>
@@ -995,6 +1040,171 @@ function buildDrugInventoryTable () {
   })
 }
 
+var SAMPLE_CHECKS = [
+  { title: 'תיאום מלאי אל מול תכולת ערכה' },
+  { title: 'בדיקת סוללות במכשירים', desc: 'האם תקין' },
+  { title: 'האם קיימת רשימת תכולה לערכה' },
+  { title: 'האם יש שילוט למסגרת' },
+  { title: 'האם יש מחברת פירוק ערכה' },
+  { title: 'ספירת סמים באחסנה' },
+]
+
+var ymachSampleCount = 0
+
+function createSampleCheck (item, saved) {
+  var div = document.createElement('div')
+  div.className = 'check-item'
+  div.dataset.status = (saved && saved.status) || 'none'
+  if (div.dataset.status === 'ok') div.classList.add('checked')
+  if (div.dataset.status === 'issue') div.classList.add('has-issue')
+
+  var btnsDiv = document.createElement('div')
+  btnsDiv.className = 'status-btns'
+
+  var okBtn = document.createElement('button')
+  okBtn.className = 'status-btn ok' + (div.dataset.status === 'ok' ? ' active' : '')
+  okBtn.type = 'button'
+  okBtn.innerHTML = '&#10003;'
+
+  var issueBtn = document.createElement('button')
+  issueBtn.className = 'status-btn issue' + (div.dataset.status === 'issue' ? ' active' : '')
+  issueBtn.type = 'button'
+  issueBtn.innerHTML = '&#10007;'
+
+  function applyStatus (next) {
+    div.dataset.status = div.dataset.status === next ? 'none' : next
+    div.classList.remove('checked', 'has-issue')
+    okBtn.classList.remove('active')
+    issueBtn.classList.remove('active')
+    if (div.dataset.status === 'ok') {
+      div.classList.add('checked')
+      okBtn.classList.add('active')
+    }
+    if (div.dataset.status === 'issue') {
+      div.classList.add('has-issue')
+      issueBtn.classList.add('active')
+    }
+    saveDraft()
+  }
+
+  okBtn.addEventListener('click', function () { applyStatus('ok') })
+  issueBtn.addEventListener('click', function () { applyStatus('issue') })
+  btnsDiv.appendChild(okBtn)
+  btnsDiv.appendChild(issueBtn)
+
+  var contentDiv = document.createElement('div')
+  contentDiv.className = 'check-content'
+
+  var titleDiv = document.createElement('div')
+  titleDiv.className = 'check-title'
+  titleDiv.textContent = item.title
+  contentDiv.appendChild(titleDiv)
+
+  if (item.desc) {
+    var descDiv = document.createElement('div')
+    descDiv.className = 'check-description'
+    descDiv.textContent = item.desc
+    contentDiv.appendChild(descDiv)
+  }
+
+  var notesInput = document.createElement('textarea')
+  notesInput.className = 'check-notes sample-check-notes'
+  notesInput.rows = 1
+  notesInput.placeholder = item.title === 'ספירת סמים באחסנה' ? 'פירוט הספירה...' : 'הערות...'
+  notesInput.value = (saved && saved.notes) || ''
+  contentDiv.appendChild(notesInput)
+
+  div.appendChild(btnsDiv)
+  div.appendChild(contentDiv)
+  return div
+}
+
+function addYmachSample (preset) {
+  preset = preset || {}
+  var idx = ymachSampleCount++
+  var container = document.getElementById('ymachSamplesContainer')
+  var wrapper = document.createElement('div')
+  wrapper.className = 'ymach-sample-block'
+  wrapper.id = 'ymach_sample_' + idx
+
+  var top = document.createElement('div')
+  top.className = 'ymach-sample-top'
+  var removeBtn = document.createElement('button')
+  removeBtn.type = 'button'
+  removeBtn.className = 'ymach-sample-remove'
+  removeBtn.textContent = '✕'
+  removeBtn.addEventListener('click', function () {
+    wrapper.remove()
+    saveDraft()
+  })
+  top.appendChild(removeBtn)
+
+  var fields = document.createElement('div')
+  var fieldDefs = [
+    { key: 'framework', label: 'מסגרת', placeholder: 'מסגרת...' },
+    { key: 'company', label: 'פלוגה', placeholder: 'פלוגה...' },
+    { key: 'kit', label: 'הערכה הנבדקת', placeholder: 'שם הערכה...' },
+  ]
+  for (var f = 0; f < fieldDefs.length; f++) {
+    var def = fieldDefs[f]
+    var group = document.createElement('div')
+    group.className = 'field-group'
+    var label = document.createElement('label')
+    label.className = 'field-label'
+    label.textContent = def.label
+    var input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'sample-field'
+    input.dataset.field = def.key
+    input.placeholder = def.placeholder
+    input.value = preset[def.key] || ''
+    group.appendChild(label)
+    group.appendChild(input)
+    fields.appendChild(group)
+  }
+
+  var checksWrap = document.createElement('div')
+  var savedChecks = preset.checks || []
+  for (var i = 0; i < SAMPLE_CHECKS.length; i++) {
+    checksWrap.appendChild(createSampleCheck(SAMPLE_CHECKS[i], savedChecks[i]))
+  }
+
+  wrapper.appendChild(top)
+  wrapper.appendChild(fields)
+  wrapper.appendChild(checksWrap)
+  container.appendChild(wrapper)
+}
+
+function buildYmachSamples () {
+  addYmachSample()
+  document.getElementById('addYmachSampleBtn').addEventListener('click', function () {
+    addYmachSample()
+  })
+}
+
+function collectYmachSamples () {
+  var samples = []
+  var blocks = document.querySelectorAll('.ymach-sample-block')
+  for (var b = 0; b < blocks.length; b++) {
+    var sample = { framework: '', company: '', kit: '', checks: [] }
+    var inputs = blocks[b].querySelectorAll('.sample-field')
+    for (var i = 0; i < inputs.length; i++) {
+      sample[inputs[i].dataset.field] = inputs[i].value || ''
+    }
+    var items = blocks[b].querySelectorAll('.check-item')
+    for (var c = 0; c < items.length; c++) {
+      var notesEl = items[c].querySelector('.sample-check-notes')
+      sample.checks.push({
+        title: SAMPLE_CHECKS[c] ? SAMPLE_CHECKS[c].title : '',
+        status: items[c].dataset.status || 'none',
+        notes: notesEl ? notesEl.value : ''
+      })
+    }
+    samples.push(sample)
+  }
+  return samples
+}
+
 var ymachKitCount = 0
 
 function addYmachKit (kitName) {
@@ -1096,6 +1306,7 @@ function init () {
   })
 
   buildDrugInventoryTable()
+  buildYmachSamples()
   buildYmachDrugTable()
   updateCounters()
 
@@ -1174,6 +1385,7 @@ function collectData () {
       }
       return arr
     })(),
+    ymachSamples: collectYmachSamples(),
     ymachKits: (function () {
       var kits = []
       var blocks = document.querySelectorAll('.ymach-kit-block')
@@ -1242,6 +1454,15 @@ function loadDraft () {
             }
           }
         }
+      }
+    }
+
+    if (data.ymachSamples && data.ymachSamples.length) {
+      var sampleBox = document.getElementById('ymachSamplesContainer')
+      sampleBox.innerHTML = ''
+      ymachSampleCount = 0
+      for (var s = 0; s < data.ymachSamples.length; s++) {
+        addYmachSample(data.ymachSamples[s])
       }
     }
 
@@ -1411,6 +1632,48 @@ function exportToWord () {
       }
       children.push(new Table({ rows: chkRows, width: { size: 100, type: WidthType.PERCENTAGE }, visuallyRightToLeft: true }))
       children.push(rtlP(rtlRun(''), { spaceAfter: 240 }))
+    }
+  }
+
+  if (data.ymachSamples && data.ymachSamples.length > 0) {
+    var printedSampleHead = false
+    for (var si = 0; si < data.ymachSamples.length; si++) {
+      var sample = data.ymachSamples[si]
+      var filledChecks = (sample.checks || []).filter(function (c) {
+        return (c.status && c.status !== 'none') || (c.notes && c.notes.trim())
+      })
+      var hasIdentity = sample.framework || sample.company || sample.kit
+      if (!hasIdentity && filledChecks.length === 0) continue
+      if (!printedSampleHead) {
+        children.push(rtlP(rtlRun('בדיקה מדגמית — ימ"ח', { bold: true, underline: true, size: 28 }), { spaceAfter: 60, keepNext: true }))
+        printedSampleHead = true
+      }
+      var idParts = []
+      if (sample.framework) idParts.push('מסגרת: ' + sample.framework)
+      if (sample.company) idParts.push('פלוגה: ' + sample.company)
+      if (sample.kit) idParts.push('ערכה: ' + sample.kit)
+      if (idParts.length) {
+        children.push(rtlP(rtlRun(idParts.join('  |  '), { bold: true, size: 22 }), { spaceAfter: 60, keepNext: true }))
+      }
+      if (filledChecks.length) {
+        var sRows = [new TableRow({ children: [hdrCell('נושא'), hdrCell('ממצאים / הערות'), hdrCell('סטטוס')], tableHeader: true, cantSplit: true })]
+        for (var sc = 0; sc < filledChecks.length; sc++) {
+          var sampleChk = filledChecks[sc]
+          var sampleSym = statusSymbol(sampleChk.status)
+          var sampleShade = sc % 2 === 1 ? { type: ShadingType.SOLID, color: LIGHT_GRAY } : undefined
+          var sampleNotes = sampleChk.notes || (sampleChk.status === 'ok' ? 'נמצא תקין' : '')
+          var sampleNoteParas = sampleNotes.split('\n').map(function (line) {
+            return rtlP(rtlRun(line, { size: 20 }))
+          })
+          sRows.push(new TableRow({ cantSplit: true, children: [
+            new TableCell({ children: [rtlP(rtlRun(sampleChk.title, { bold: true, size: 20 }))], shading: sampleShade }),
+            new TableCell({ children: sampleNoteParas, shading: sampleShade }),
+            new TableCell({ children: [rtlP(rtlRun(sampleSym.text, { bold: true, size: 22, color: sampleSym.color }), { alignment: AlignmentType.CENTER })], shading: sampleShade }),
+          ]}))
+        }
+        children.push(new Table({ rows: sRows, width: { size: 100, type: WidthType.PERCENTAGE }, visuallyRightToLeft: true }))
+      }
+      children.push(rtlP(rtlRun(''), { spaceAfter: 160 }))
     }
   }
 
