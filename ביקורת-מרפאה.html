@@ -737,6 +737,7 @@ const SECTIONS = {
       { title: 'זיווד רכב - אמבולנס', desc: '6 מסכות חמצן, 2 ווסתי חמצן קיר, 2 מטפים' },
       { title: 'ער\' צר"פ / מט"ב (תקן חדש)', desc: 'לרינגוסקופ, אמבו, מדל"ד, סטטוסקופ, טרוקר, קוניוטומיה' },
       { title: 'תיק אר"ן גדודי', desc: 'לרינגוסקופ, אמבו, טובוסים, משאבה רגלית' },
+      { title: 'האם תיק אר"ן בתקן החדש', desc: '' },
       { title: 'בלון חמצן מרכזי באמבולנס', desc: 'בדיקה הידרוסטטית בתוקף, תוקף בלון, תוקף ווסת, לחץ', noteHints: 'תוקף בלון חמצן-\nתוקף וסת-\nלחץ בלון-' },
       { title: 'ערכה להעשרה בחמצן', desc: 'ווסת מכויל, בדיקה הידרוסטטית בתוקף, תוקף בלון, לחץ', noteHints: 'תוקף בלון חמצן-\nתוקף וסת-\nלחץ בלון-' },
       { title: 'בלון חמצן רזרבי', desc: 'בדיקה הידרוסטטית בתוקף, תוקף בלון, לחץ', noteHints: 'תוקף בלון חמצן-\nתוקף וסת-\nלחץ בלון-' },
@@ -830,6 +831,8 @@ const SECTIONS = {
     items: [
       { title: 'שליטה ובקרה כללית', desc: '' },
       { title: 'שליטה ובקרה על ערכות פתוחות וסגורות', desc: '' },
+      { title: 'צר"פ צוות רפואה רקמה — הימצאות', desc: 'האם קיים' },
+      { title: 'צר"פ צוות רפואה רקמה — שילוט', desc: 'האם יש שילוט' },
     ]
   }
 }
@@ -1443,8 +1446,17 @@ function loadDraft () {
       for (var k = 0; k < keys.length; k++) {
         var key = keys[k]
         var items = data.sections[key]
+        if (!SECTIONS[key]) continue
         for (var i = 0; i < items.length; i++) {
-          var id = key + '_' + i
+          var targetIdx = -1
+          for (var t = 0; t < SECTIONS[key].items.length; t++) {
+            if (SECTIONS[key].items[t].title === items[i].title) {
+              targetIdx = t
+              break
+            }
+          }
+          if (targetIdx === -1) continue
+          var id = key + '_' + targetIdx
           if (state[id]) {
             state[id].notes = items[i].notes || ''
             var notesEl = document.querySelector('#item_' + id + ' .check-notes')
